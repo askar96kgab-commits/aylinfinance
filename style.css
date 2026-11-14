@@ -114,3 +114,24 @@ nav button{font-size:10px;color:#929aa5}nav button.active{color:var(--green)}nav
 .motto{background:var(--bg);color:#8b939d}.floating-add{background:linear-gradient(145deg,#20b66d,#078557);box-shadow:0 7px 20px #07855740;width:58px;height:58px;bottom:calc(104px + env(safe-area-inset-bottom))}
 dialog{border-radius:24px}input:focus,select:focus{outline:2px solid #9cdbbb;border-color:var(--green)}
 @media(max-width:390px){.quick-grid{gap:7px}.quick-tile{min-height:96px}.quick-icon{width:43px;height:43px}.quick-tile b{font-size:10px}.balance{font-size:30px}.hero{padding:19px 17px}.home-section-head h3{font-size:16px}.home-list-row>strong,.home-person-row>strong{font-size:11px}}
+
+
+/* v15: убраны дублирующие быстрые ссылки; нижняя навигация оформлена карточками */
+.quick-grid{display:none!important}
+nav{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:7px;align-items:stretch;background:var(--bg);border-top:0;padding:8px 10px calc(9px + env(safe-area-inset-bottom));backdrop-filter:none}
+nav button{min-width:0;min-height:66px;border:0;border-radius:16px;background:#fff;color:#929aa5;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;padding:7px 2px;font-size:9px;line-height:1.1;font-weight:600;box-shadow:0 3px 12px #1a322408}
+nav button span{width:34px;height:34px;border-radius:50%;display:grid;place-items:center;background:var(--green-soft);color:var(--green);font-size:20px;line-height:1}
+nav button.active{background:#fff;color:var(--green);font-weight:750;box-shadow:0 3px 14px #087b5718}
+nav button.active span{background:var(--green);color:#fff}
+@media(max-width:390px){nav{gap:5px;padding-left:8px;padding-right:8px}nav button{min-height:62px;font-size:8.5px;border-radius:14px}nav button span{width:31px;height:31px;font-size:19px}}
+
+/* v17: clearer payment rows for narrow mobile screens */
+.payment-item{display:grid;grid-template-columns:38px minmax(0,1fr) auto;align-items:center;column-gap:12px;row-gap:8px;padding:15px 13px}
+.payment-main{min-width:0}
+.payment-main b{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:15px;line-height:1.25}
+.payment-main small{display:block;font-size:13px;white-space:nowrap;margin-top:5px}
+.payment-amount{font-size:16px;font-weight:800;white-space:nowrap;align-self:start;padding-top:1px}
+.payment-actions{grid-column:2 / 4;display:flex;align-items:center;justify-content:flex-end;gap:7px;flex-wrap:wrap}
+.payment-actions .ghost{font-size:13px;padding:5px 7px;white-space:nowrap}
+.payment-item .badge{font-size:12px;line-height:1.25}
+@media(max-width:390px){.payment-item{column-gap:9px;padding:13px 10px}.payment-amount{font-size:14px}.payment-main b{font-size:14px}.payment-actions .ghost{font-size:12px;padding:5px 5px}}

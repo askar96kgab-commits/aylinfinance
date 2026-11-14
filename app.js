@@ -3,6 +3,7 @@ const fmt=n=>new Intl.NumberFormat('ru-RU',{maximumFractionDigits:2}).format(Num
 const today=()=>{const d=new Date();return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`};
 const monthKey=d=>(d||today()).slice(0,7);
 const monthLabel=k=>{const [y,m]=k.split('-').map(Number);return new Date(y,m-1,1).toLocaleDateString('ru-RU',{month:'long',year:'numeric'})};
+const dateLabel=d=>{const [y,m,day]=(d||today()).split('-');return `${day}.${m}.${y}`};
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const expenseCategories=['Питание на улице','Питание на работе','Продукты домой','Одежда','Бензин','Тутун','Непредвиденные расходы','Транспорт','Жильё и коммунальные услуги','Здоровье','Развлечения','Другое'];
 let db;
@@ -38,15 +39,9 @@ function render(){
  let html='';
  if(tab==='home'){
  const mo=totals(thisMonthOps());
- const upcoming=db.payments.filter(p=>monthKey(p.date)===monthKey()&&remaining(p)>0).sort((a,b)=>a.date.localeCompare(b.date)).slice(0,2);
+ const upcoming=db.payments.filter(p=>(p.date||'')>=today()&&remaining(p)>0).sort((a,b)=>(a.date||'').localeCompare(b.date||'')).slice(0,2);
  const people=[...new Set(db.debts.map(d=>(d.person||'').trim()).filter(Boolean))].map(person=>({person,items:db.debts.filter(d=>(d.person||'').trim()===person)})).map(g=>({...g,total:g.items.reduce((s,d)=>s+remaining(d),0)})).filter(g=>g.total>0).sort((a,b)=>b.total-a.total).slice(0,3);
  html=`<section class="hero"><div class="hero-top"><div class="eyebrow">Общий баланс</div><span class="hero-eye">◉</span></div><div class="balance">${fmt(bal)}</div><div class="metrics"><div class="metric"><small>Доходы за месяц</small><b>${fmt(mo.income)}</b></div><div class="metric"><small>Расходы за месяц</small><b>${fmt(mo.expense)}</b></div></div></section>
- <div class="quick-grid">
- <button class="quick-tile" onclick="go('ops')"><span class="quick-icon">⇄</span><b>Операции</b></button>
- <button class="quick-tile" onclick="go('payments')"><span class="quick-icon">▦</span><b>Платежи</b></button>
- <button class="quick-tile" onclick="go('debts')"><span class="quick-icon">↔</span><b>Долги</b></button>
- <button class="quick-tile" onclick="go('stats')"><span class="quick-icon">▥</span><b>Аналитика</b></button>
- </div>
  <div class="home-section-head"><h3>Ближайшие платежи</h3><button class="text-link" onclick="go('payments')">Ещё</button></div>
  ${upcoming.length?upcoming.map(p=>`<div class="home-list-row"><span class="home-list-icon purple">⌂</span><div class="home-list-main"><b>${esc(p.title)}</b><small>${esc(p.date)}</small></div><strong>${fmt(remaining(p))}</strong><span class="row-chevron">›</span></div>`).join(''):empty('На этот месяц все платежи оплачены.')}
  <div class="home-section-head"><h3>Долги</h3><button class="text-link" onclick="go('debts')">Ещё</button></div>
@@ -63,10 +58,10 @@ function render(){
  <div class="filter-row"><button class="${opsFilter==='all'?'selected':''}" onclick="setOpsFilter('all')">Все</button><button class="${opsFilter==='income'?'selected':''}" onclick="setOpsFilter('income')">Доходы</button><button class="${opsFilter==='expense'?'selected':''}" onclick="setOpsFilter('expense')">Расходы</button><button class="${opsFilter==='purchases'?'selected':''}" onclick="setOpsFilter('purchases')">История покупок</button></div>
  ${months.map(m=>`<h3 class="month-heading">${monthLabel(m)}</h3>${shown.filter(o=>monthKey(o.date)===m).map(o=>row(o.title,(o.category||'Без категории')+' · '+o.date,(o.kind==='income'?'+':'−')+fmt(o.amount),o.kind,o.kind==='income'?'↙':'↗',`<button class="ghost" aria-label="Удалить" onclick="removeItem('ops',${o.id})">×</button>`)).join('')}`).join('')||empty('Записей пока нет.')}`;
  } else if(tab==='payments'){
- const months=[...new Set(db.payments.map(p=>monthKey(p.date)))].sort().reverse();
+ const months=[...new Set(db.payments.map(p=>monthKey(p.date)))].sort((a,b)=>a.localeCompare(b));
  html=`<div class="topline"><h2>Мои платежи</h2></div>
  <div class="panel summary-line"><b>${pending}</b> платежей ожидают оплаты <strong>Остаток на этот месяц: ${fmt(monthPay)}</strong>${pending===0?'<div class="badge paid">Все платежи за этот месяц оплачены</div>':''}</div>
- ${months.map(m=>{const ps=db.payments.filter(p=>monthKey(p.date)===m).sort((a,b)=>a.date.localeCompare(b.date));const sum=ps.reduce((s,p)=>s+remaining(p),0);return `<section class="month-group"><div class="month-head"><h3>${monthLabel(m)}</h3><b>${fmt(sum)}</b></div>${sum===0?'<div class="badge paid">Все платежи оплачены · 0 сом</div>':''}${ps.map(p=>`<div class="item"><div class="bubble">▦</div><div class="item-content"><b>${esc(p.title)}</b><small>${p.date} · ${p.repeat?'Ежемесячно':'Разовый'}</small><span class="badge ${remaining(p)===0?'paid':''}">${remaining(p)===0?'Оплачено':Number(p.paidAmount||0)>0?`Оплачено ${fmt(p.paidAmount)} · Остаток ${fmt(remaining(p))}`:`Остаток ${fmt(remaining(p))}`}</span></div><div class="amount">${fmt(p.amount)}${remaining(p)>0?`<button class="ghost" onclick="recordPayment(${p.id})">Оплатить</button>`:''}${Number(p.paidAmount||0)===0?`<button class="ghost" onclick="editPayment(${p.id})">Изменить</button>`:''}<button class="ghost" onclick="removeItem('payments',${p.id})">×</button></div></div>`).join('')}</section>`}).join('')||empty('Добавьте регулярные или разовые платежи.')}`;
+ ${months.map(m=>{const ps=db.payments.filter(p=>monthKey(p.date)===m).sort((a,b)=>a.date.localeCompare(b.date));const sum=ps.reduce((s,p)=>s+remaining(p),0);return `<section class="month-group"><div class="month-head"><h3>${monthLabel(m)}</h3><b>${fmt(sum)}</b></div>${sum===0?'<div class="badge paid">Все платежи оплачены · 0 сом</div>':''}${ps.map(p=>`<div class="item payment-item"><div class="bubble">▦</div><div class="item-content payment-main"><b title="${esc(p.title)}">${esc(p.title)}</b><small>${dateLabel(p.date)} · ${p.repeat?'Ежемесячно':'Разовый'}</small><span class="badge ${remaining(p)===0?'paid':''}">${remaining(p)===0?'Оплачено':Number(p.paidAmount||0)>0?`Оплачено ${fmt(p.paidAmount)} · Остаток ${fmt(remaining(p))}`:`Остаток ${fmt(remaining(p))}`}</span></div><strong class="payment-amount">${fmt(p.amount)}</strong><div class="payment-actions">${remaining(p)>0?`<button class="ghost" onclick="recordPayment(${p.id})">Оплатить</button>`:''}${Number(p.paidAmount||0)===0?`<button class="ghost" onclick="editPayment(${p.id})">Изменить</button>`:''}<button class="ghost" onclick="removeItem('payments',${p.id})">×</button></div></div>`).join('')}</section>`}).join('')||empty('Добавьте регулярные или разовые платежи.')}`;
  } else if(tab==='debts'){
  const names=[...new Set(db.debts.map(d=>d.person.trim()))].sort((a,b)=>a.localeCompare(b,'ru'));
  const grouped=names.map(person=>({person,items:db.debts.filter(d=>d.person.trim()===person)}));
