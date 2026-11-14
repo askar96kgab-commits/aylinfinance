@@ -50,3 +50,67 @@ body,.app{touch-action:pan-y}
 .app{min-width:0}
 main{width:100%;max-width:100%;touch-action:pan-y pinch-zoom}
 input,select,textarea{font-size:16px}
+
+/* Группы долгов: сворачиваемые карточки по человеку */
+.debt-person{margin:14px 0 22px}
+.debt-person-head{display:flex;align-items:center;gap:8px;justify-content:space-between;margin-bottom:10px}
+.debt-person-toggle{flex:1;min-width:0;display:flex;flex-direction:column;align-items:flex-start;gap:5px;text-align:left;padding:12px 14px;border:0;border-radius:14px;background:#fff;color:#18243b}
+.debt-person-name{font-size:18px;font-weight:700}
+.debt-person-total{font-size:14px;color:#7183a3;line-height:1.35}
+.debt-chevron{position:absolute;right:18px;color:#2878e8;font-size:20px}
+.debt-person-toggle{position:relative;padding-right:38px}
+.debt-person-details{padding-top:2px}
+
+/* Кликабельные фильтры «Мне должны» и «Я должен» */
+.debt-summary{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:14px 0 22px}
+.debt-summary button{display:flex;flex-direction:column;align-items:flex-start;gap:7px;width:100%;padding:16px;border:1px solid transparent;border-radius:18px;background:#fff;color:#18243b;text-align:left;cursor:pointer}
+.debt-summary button small{font-size:14px;color:#7b8dab}
+.debt-summary button b{font-size:22px}
+.debt-summary button.active{border-color:#3479e8;background:#edf4ff;box-shadow:0 0 0 1px #3479e8}
+
+/* Единая компактная плавающая кнопка добавления */
+.floating-add{position:fixed;z-index:40;right:20px;bottom:calc(112px + env(safe-area-inset-bottom));width:54px;height:54px;border:0;border-radius:50%;background:#2878e8;color:#fff;font-size:32px;font-weight:400;line-height:1;display:flex;align-items:center;justify-content:center;box-shadow:0 5px 18px rgba(30,83,160,.28);cursor:pointer}
+.floating-add:active{transform:scale(.96)}
+@media(max-width:380px){.floating-add{right:16px;width:50px;height:50px;font-size:30px;bottom:calc(108px + env(safe-area-inset-bottom))}}
+
+/* AylinFinance v13 — green banking-inspired visual system */
+:root{--navy:#171b29;--blue:#15965d;--bg:#eef0ef;--muted:#737b88;--line:#e5e8e7;--green:#15965d;--green-dark:#087c58;--green-soft:#e4f5ec;--red:#c94c66}
+body{background:var(--bg);color:var(--navy)}.app{max-width:760px;background:var(--bg)}
+header{padding:14px 18px 12px;background:var(--bg)}.mark{background:linear-gradient(145deg,#087b57,#22b66f);border-radius:16px;width:46px;height:46px}
+.brand b{font-size:18px;letter-spacing:-.35px}.brand small{font-size:11px}.header-actions .ghost{color:var(--green);font-size:12px}
+main{padding:10px 16px 28px}.hero{position:relative;overflow:hidden;border-radius:26px;padding:22px 20px;background:linear-gradient(135deg,#08795b 0%,#0b9669 56%,#24b77c 100%);box-shadow:0 10px 24px #087b5720}
+.hero:after{content:"";position:absolute;width:260px;height:190px;right:-70px;top:-58px;border-radius:50%;background:linear-gradient(145deg,#ffffff18,#ffffff04);transform:rotate(-24deg)}
+.hero-top{display:flex;align-items:center;justify-content:space-between;position:relative;z-index:1}.eyebrow{color:#e1f5eb;font-size:14px}.hero-eye{color:#e7fff1;font-size:20px}
+.balance{position:relative;z-index:1;font-size:34px;letter-spacing:-.9px;margin:8px 0 22px}.metrics{position:relative;z-index:1;gap:12px}.metric{min-width:0}.metric small{color:#d1f1e1;font-size:12px}.metric b{font-size:15px;overflow-wrap:anywhere}
+.quick-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:9px;margin:14px 0 24px}
+.quick-tile{background:#fff;border-radius:20px;min-width:0;min-height:104px;padding:12px 5px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:9px;color:var(--navy);box-shadow:0 4px 16px #1a322408}
+.quick-icon{width:48px;height:48px;border-radius:50%;background:var(--green-soft);color:var(--green);display:grid;place-items:center;font-size:25px;font-weight:700}
+.quick-tile b{font-size:11px;font-weight:650;white-space:nowrap}
+.home-section-head{display:flex;justify-content:space-between;align-items:center;margin:20px 2px 10px;gap:8px}.home-section-head h3{font-size:18px;margin:0;letter-spacing:-.3px}
+.text-link{background:transparent;color:var(--green);font-size:13px;font-weight:700;padding:5px}
+.home-list-row,.home-person-row{display:flex;align-items:center;gap:11px;background:#fff;border-radius:19px;padding:13px;margin:8px 0;min-width:0;box-shadow:0 3px 14px #1a322406}
+.home-list-icon{width:42px;height:42px;display:grid;place-items:center;border-radius:50%;font-size:21px;flex:none}.home-list-icon.purple{background:#f2e8ff;color:#9653e8}
+.home-list-main,.home-person-name{min-width:0;flex:1}.home-list-main b,.home-person-name b{display:block;font-size:13px;overflow-wrap:anywhere}
+.home-list-main small,.home-person-name small{display:block;color:var(--muted);font-size:11px;margin-top:3px}
+.home-list-row>strong,.home-person-row>strong{font-size:13px;white-space:nowrap}.row-chevron{color:#9ba3ad;font-size:23px;margin-left:2px}
+.home-debt-summary{margin:0 0 10px;gap:9px}.home-debt-summary button{position:relative;border-radius:18px;padding:13px;background:#e7f6ed}
+.home-debt-summary button:nth-child(2){background:#fff0f2}.home-debt-summary button small{font-size:12px;color:#536b5d}
+.home-debt-summary button:nth-child(2) small{color:#9b5365}.home-debt-summary button b{font-size:17px;color:#145a38}
+.home-debt-summary button:nth-child(2) b{color:#a52c50}.home-debt-summary button span{position:absolute;right:12px;top:50%;transform:translateY(-50%);font-size:23px;color:var(--green)}
+.home-people{background:#fff;border-radius:20px;padding:2px 12px}.home-person-row{width:100%;margin:0;padding:12px 2px;border-radius:0;box-shadow:none;border-bottom:1px solid var(--line);text-align:left;color:inherit}
+.home-person-row:last-child{border-bottom:0}.person-avatar{width:39px;height:39px;border-radius:50%;display:grid;place-items:center;background:var(--green-soft);color:var(--green);font-size:17px;flex:none}
+.home-operations .item{border-radius:0;box-shadow:none;border-bottom:1px solid var(--line);margin:0;padding:12px 3px}.home-operations{background:#fff;border-radius:20px;padding:2px 13px}
+.home-operations .bubble{background:var(--green-soft);color:var(--green);border-radius:50%}
+.tile,.panel,.item,.category-stat,.month-row{border-radius:18px}.section-title{font-size:18px}.topline{margin:8px 2px 14px}
+.topline h2,main>h2{font-size:25px;letter-spacing:-.5px}.primary{background:var(--green)}.secondary{background:#e3f3ea;color:#176e49}
+.filter-row button{background:#fff;color:#6f7885}.filter-row button.selected{background:var(--green);color:white}
+.item{box-shadow:0 3px 14px #1a322406}.bubble{background:var(--green-soft);color:var(--green);border-radius:50%}
+.amount.income,.income{color:var(--green)}.amount.expense,.expense{color:var(--red)}.badge.paid{background:#e2f5e9;color:#16834e}.badge{border-radius:20px}
+.debt-summary button.active{border-color:var(--green);background:#e7f6ed;box-shadow:0 0 0 1px var(--green)}
+.debt-person-toggle{border-radius:17px}.debt-person-name{font-size:16px}.small-action{background:#e5f5ec;color:var(--green);border-radius:20px}
+.debt-entry{border-radius:16px}.category-stat,.month-row{box-shadow:0 3px 14px #1a322406}.progress i{background:var(--green)}
+nav{background:#fffffff2;border-top:1px solid #e2e6e4;padding:8px 5px calc(8px + env(safe-area-inset-bottom))}
+nav button{font-size:10px;color:#929aa5}nav button.active{color:var(--green)}nav button span{font-size:22px}
+.motto{background:var(--bg);color:#8b939d}.floating-add{background:linear-gradient(145deg,#20b66d,#078557);box-shadow:0 7px 20px #07855740;width:58px;height:58px;bottom:calc(104px + env(safe-area-inset-bottom))}
+dialog{border-radius:24px}input:focus,select:focus{outline:2px solid #9cdbbb;border-color:var(--green)}
+@media(max-width:390px){.quick-grid{gap:7px}.quick-tile{min-height:96px}.quick-icon{width:43px;height:43px}.quick-tile b{font-size:10px}.balance{font-size:30px}.hero{padding:19px 17px}.home-section-head h3{font-size:16px}.home-list-row>strong,.home-person-row>strong{font-size:11px}}
