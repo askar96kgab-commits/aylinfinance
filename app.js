@@ -12,20 +12,22 @@ db.payments=Array.isArray(db.payments)?db.payments:[];
 db.debts=Array.isArray(db.debts)?db.debts:[];
 db.debtHistory=Array.isArray(db.debtHistory)?db.debtHistory:[];
 db.ops.forEach(o=>{if(!o.date)o.date=today();if(!o.category)o.category='Без категории'});
-db.debts.forEach(d=>{if(!d.date)d.date=today();if(!d.id)d.id=Date.now()+Math.random()});
+db.payments.forEach(p=>{if(p.paidAmount===undefined)p.paidAmount=p.paid?Number(p.amount):0;p.paidAmount=Math.min(Number(p.amount)||0,Math.max(0,Number(p.paidAmount)||0));p.paid=p.paidAmount>=Number(p.amount)});
+db.debts.forEach(d=>{if(!d.date)d.date=today();if(!d.id)d.id=Date.now()+Math.random();if(d.paidAmount===undefined)d.paidAmount=0;d.paidAmount=Math.min(Number(d.amount)||0,Math.max(0,Number(d.paidAmount)||0))});
 let tab='home', opsFilter='all', reportMode=false;
 function persist(){localStorage.setItem('aylinfinance-data',JSON.stringify(db))}
 function save(){persist();render()}
 function totals(list=db.ops){return list.reduce((a,o)=>(a[o.kind]+=Number(o.amount),a),{income:0,expense:0})}
 function thisMonthOps(){return db.ops.filter(o=>monthKey(o.date)===monthKey())}
-function currentPayments(){return db.payments.filter(p=>monthKey(p.date)===monthKey()&&!p.paid)}
-function debtTotals(){return db.debts.reduce((a,d)=>{a[d.direction]+=Number(d.amount);return a},{owe:0,owed:0})}
+function remaining(x){return Math.max(0,Number(x.amount||0)-Number(x.paidAmount||0))}
+function currentPayments(){return db.payments.filter(p=>monthKey(p.date)===monthKey()&&remaining(p)>0)}
+function debtTotals(){return db.debts.reduce((a,d)=>{a[d.direction]+=remaining(d);return a},{owe:0,owed:0})}
 function empty(t){return `<div class="empty">${t}</div>`}
 function row(title,sub,amount,cls='',icon='•',right=''){return `<div class="item"><div class="bubble">${icon}</div><div class="item-content"><b>${esc(title)}</b><small>${esc(sub)}</small></div><div class="amount ${cls}">${amount||''}${right}</div></div>`}
 function go(to){tab=to;render();$('#view').scrollTop=0}
 function render(){
- const all=totals(),bal=all.income-all.expense, pending=db.payments.filter(p=>!p.paid).length;
- const monthPay=db.payments.filter(p=>monthKey(p.date)===monthKey()).reduce((s,p)=>s+Number(p.amount),0);
+ const all=totals(),bal=all.income-all.expense, pending=currentPayments().length;
+ const monthPay=db.payments.filter(p=>monthKey(p.date)===monthKey()).reduce((s,p)=>s+remaining(p),0);
  const debts=debtTotals();
  let html='';
  if(tab==='home'){
@@ -48,14 +50,14 @@ function render(){
  } else if(tab==='payments'){
  const months=[...new Set(db.payments.map(p=>monthKey(p.date)))].sort().reverse();
  html=`<div class="topline"><h2>Мои платежи</h2><button class="primary" onclick="openForm('payment')">＋ Добавить</button></div>
- <div class="panel summary-line"><b>${pending}</b> платежей ожидают оплаты <strong>На этот месяц: ${fmt(monthPay)}</strong></div>
- ${months.map(m=>{const ps=db.payments.filter(p=>monthKey(p.date)===m).sort((a,b)=>a.date.localeCompare(b.date));const sum=ps.reduce((s,p)=>s+Number(p.amount),0);return `<section class="month-group"><div class="month-head"><h3>${monthLabel(m)}</h3><b>${fmt(sum)}</b></div>${ps.map(p=>`<div class="item"><div class="bubble">▦</div><div class="item-content"><b>${esc(p.title)}</b><small>${p.date} · ${p.repeat?'Ежемесячно':'Разовый'}</small><span class="badge ${p.paid?'paid':''}">${p.paid?'Оплачено':'Ожидает'}</span></div><div class="amount">${fmt(p.amount)}<button class="ghost" onclick="togglePaid(${p.id})">${p.paid?'↶':'✓'}</button><button class="ghost" onclick="removeItem('payments',${p.id})">×</button></div></div>`).join('')}</section>`}).join('')||empty('Добавьте регулярные или разовые платежи.')}`;
+ <div class="panel summary-line"><b>${pending}</b> платежей ожидают оплаты <strong>Остаток на этот месяц: ${fmt(monthPay)}</strong>${pending===0?'<div class="badge paid">Все платежи за этот месяц оплачены</div>':''}</div>
+ ${months.map(m=>{const ps=db.payments.filter(p=>monthKey(p.date)===m).sort((a,b)=>a.date.localeCompare(b.date));const sum=ps.reduce((s,p)=>s+remaining(p),0);return `<section class="month-group"><div class="month-head"><h3>${monthLabel(m)}</h3><b>${fmt(sum)}</b></div>${sum===0?'<div class="badge paid">Все платежи оплачены · 0 сом</div>':''}${ps.map(p=>`<div class="item"><div class="bubble">▦</div><div class="item-content"><b>${esc(p.title)}</b><small>${p.date} · ${p.repeat?'Ежемесячно':'Разовый'}</small><span class="badge ${remaining(p)===0?'paid':''}">${remaining(p)===0?'Оплачено':`Оплачено ${fmt(p.paidAmount)} · Остаток ${fmt(remaining(p))}`}</span></div><div class="amount">${fmt(remaining(p))}${remaining(p)>0?`<button class="ghost" onclick="recordPayment(${p.id})">Оплатить</button>`:''}<button class="ghost" onclick="removeItem('payments',${p.id})">×</button></div></div>`).join('')}</section>`}).join('')||empty('Добавьте регулярные или разовые платежи.')}`;
  } else if(tab==='debts'){
  const names=[...new Set(db.debts.map(d=>d.person.trim()))].sort((a,b)=>a.localeCompare(b,'ru'));
  const grouped=names.map(person=>({person,items:db.debts.filter(d=>d.person.trim()===person)}));
  html=`<div class="topline"><h2>Долги</h2><button class="primary" onclick="openForm('debt')">＋ Добавить</button></div>
  <div class="debt-summary"><div><small>Мне должны</small><b>${fmt(debts.owed)}</b></div><div><small>Я должен</small><b>${fmt(debts.owe)}</b></div></div>
- ${grouped.map(g=>{const owed=g.items.filter(x=>x.direction==='owed').reduce((s,x)=>s+Number(x.amount),0),owe=g.items.filter(x=>x.direction==='owe').reduce((s,x)=>s+Number(x.amount),0);return `<section class="debt-person"><div class="month-head"><h3>${esc(g.person)}</h3><button class="small-action" onclick="openForm('debt','${esc(g.person).replace(/'/g,"&#39;")}')">＋ Новый долг</button></div>${g.items.slice().sort((a,b)=>(b.date||'').localeCompare(a.date||'')).map(d=>`<div class="debt-entry"><div><b>${d.direction==='owed'?'Мне должны':'Я должен'} · ${fmt(d.amount)}</b><small>${esc(d.date||'Дата не указана')}</small>${d.note?`<small>${esc(d.note)}</small>`:''}</div><button class="ghost" onclick="removeItem('debts',${d.id})">×</button></div>`).join('')}<div class="person-total">Итого: ${owed?`мне должны ${fmt(owed)}`:''}${owed&&owe?' · ':''}${owe?`я должен ${fmt(owe)}`:''}</div></section>`}).join('')||empty('Пока нет долгов.')}`;
+ ${grouped.map(g=>{const owed=g.items.filter(x=>x.direction==='owed').reduce((s,x)=>s+remaining(x),0),owe=g.items.filter(x=>x.direction==='owe').reduce((s,x)=>s+remaining(x),0);return `<section class="debt-person"><div class="month-head"><h3>${esc(g.person)}</h3><button class="small-action" onclick="openForm('debt','${esc(g.person).replace(/'/g,"&#39;")}')">＋ Новый долг</button></div>${g.items.slice().sort((a,b)=>(b.date||'').localeCompare(a.date||'')).map(d=>`<div class="debt-entry"><div><b>${d.direction==='owed'?'Мне должны':'Я должен'} · Остаток ${fmt(remaining(d))}</b><small>${esc(d.date||'Дата не указана')} · Было ${fmt(d.amount)} · Погашено ${fmt(d.paidAmount)}</small>${d.note?`<small>${esc(d.note)}</small>`:''}</div><div><button class="ghost" onclick="recordDebtPayment(${d.id})" ${remaining(d)===0?'disabled':''}>Погасить</button><button class="ghost" onclick="removeItem('debts',${d.id})">×</button></div></div>`).join('')}<div class="person-total">Итого: ${owed?`мне должны ${fmt(owed)}`:''}${owed&&owe?' · ':''}${owe?`я должен ${fmt(owe)}`:''}</div></section>`}).join('')||empty('Пока нет долгов.')}`;
  } else {
  const mo=thisMonthOps(), mt=totals(mo), byCat=mo.filter(o=>o.kind==='expense').reduce((s,o)=>(s[o.category||'Без категории']=(s[o.category||'Без категории']||0)+Number(o.amount),s),{});
  const max=Math.max(...Object.values(byCat),1);
@@ -71,25 +73,51 @@ function render(){
 function setOpsFilter(v){opsFilter=v;render()}
 document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>go(b.dataset.tab));
 function removeItem(table,id){if(confirm('Удалить запись?')){db[table]=db[table].filter(x=>String(x.id)!==String(id));save()}}
-function togglePaid(id){
+function recordPayment(id){
  const p=db.payments.find(x=>String(x.id)===String(id));if(!p)return;
- p.paid=!p.paid;
- // После оплаты ежемесячного платежа создаём следующий месяц, не меняя историю.
+ const left=remaining(p);if(left<=0)return;
+ const raw=prompt(`Остаток по платежу «${p.title}»: ${fmt(left)}\\nВведите сумму, которую Вы оплатили:`,String(left));
+ if(raw===null)return;const amount=Number(String(raw).replace(',','.'));
+ if(!(amount>0)||amount>left)return alert('Введите сумму больше нуля и не больше остатка.');
+ p.paidAmount=Number(p.paidAmount||0)+amount;p.paid=p.paidAmount>=Number(p.amount);
  if(p.paid&&p.repeat){
    const [y,m,d]=p.date.split('-').map(Number);const next=new Date(y,m,Math.min(d,new Date(y,m+1,0).getDate()));
    const nd=`${next.getFullYear()}-${String(next.getMonth()+1).padStart(2,'0')}-${String(next.getDate()).padStart(2,'0')}`;
-   if(!db.payments.some(x=>x.title===p.title&&x.date===nd))db.payments.push({id:Date.now()+Math.random(),title:p.title,amount:p.amount,date:nd,repeat:true,paid:false});
+   if(!db.payments.some(x=>x.title===p.title&&x.date===nd))db.payments.push({id:Date.now()+Math.random(),title:p.title,amount:p.amount,date:nd,repeat:true,paid:false,paidAmount:0});
  }
  save();
 }
+function recordDebtPayment(id){
+ const d=db.debts.find(x=>String(x.id)===String(id));if(!d)return;
+ const left=remaining(d);if(left<=0)return;
+ const raw=prompt(`Остаток долга: ${fmt(left)}\\nВведите сумму погашения:`,String(left));
+ if(raw===null)return;const amount=Number(String(raw).replace(',','.'));
+ if(!(amount>0)||amount>left)return alert('Введите сумму больше нуля и не больше остатка.');
+ d.paidAmount=Number(d.paidAmount||0)+amount;save();
+}
+
 function openForm(type,preset=''){
  const fields=$('#formFields');$('#modalTitle').textContent=type==='operation'?'Новая операция':type==='payment'?'Новый платёж':'Новый долг';
  let html='';
  if(type==='operation')html=`<label>Тип операции<select name="kind" id="opKind"><option value="expense">Расход</option><option value="income">Доход</option></select></label><label>Название<input name="title" required placeholder="Например, зарплата"></label><label>Сумма, сом<input name="amount" required type="number" min="0.01" step="0.01"></label><label>Категория<select name="category" id="opCategory">${expenseCategories.map(c=>`<option>${c}</option>`).join('')}<option>Зарплата</option><option>Дополнительный доход</option></select></label><label>Дата<input name="date" type="date" value="${today()}" required></label>`;
  if(type==='payment')html=`<label>Название<input name="title" required placeholder="Аренда, кредит, интернет"></label><label>Сумма, сом<input name="amount" required type="number" min="0.01" step="0.01"></label><label>Дата оплаты<input name="date" type="date" value="${today()}" required></label><label>Повторение<select name="repeat"><option value="yes">Ежемесячно</option><option value="no">Разовый платёж</option></select></label>`;
- if(type==='debt')html=`<label>ФИО / имя должника<input name="person" id="debtPerson" list="debtNames" autocomplete="off" required placeholder="Начните вводить имя"><datalist id="debtNames">${[...new Set(db.debts.map(d=>d.person))].map(n=>`<option value="${esc(n)}">`).join('')}</datalist><small class="hint">Выберите существующее имя или введите новое.</small></label><label>Сумма, сом<input name="amount" required type="number" min="0.01" step="0.01"></label><label>Тип<select name="direction"><option value="owed">Мне должны</option><option value="owe">Я должен</option></select></label><label>Дата долга<input name="date" type="date" value="${today()}" required></label><label>Примечание (необязательно)<input name="note" placeholder="Например, за покупку"></label>`;
+ if(type==='debt')html=`<label>ФИО / имя должника<input name="person" id="debtPerson" autocomplete="off" required placeholder="Начните вводить имя"><div id="debtSuggestions" class="suggestions" hidden></div><small class="hint">Начните вводить имя — появятся сохранённые варианты. Можно ввести новое имя.</small></label><label>Сумма, сом<input name="amount" required type="number" min="0.01" step="0.01"></label><label>Тип<select name="direction"><option value="owed">Мне должны</option><option value="owe">Я должен</option></select></label><label>Дата долга<input name="date" type="date" value="${today()}" required></label><label>Примечание (необязательно)<input name="note" placeholder="Например, за покупку"></label>`;
  fields.innerHTML=html;$('#modal').dataset.type=type;$('#modal').showModal();
- if(type==='debt'&&preset)$('#debtPerson').value=preset;
+ if(type==='debt'){
+ const personInput=$('#debtPerson'),suggestions=$('#debtSuggestions');
+ if(preset)personInput.value=preset;
+ const names=[...new Set(db.debts.map(d=>(d.person||'').trim()).filter(Boolean))];
+ const showSuggestions=()=>{
+  const q=personInput.value.trim().toLocaleLowerCase('ru');
+  const matches=names.filter(n=>!q||n.toLocaleLowerCase('ru').includes(q));
+  suggestions.innerHTML=matches.length?matches.map(n=>`<button type="button" class="suggestion-option">${esc(n)}</button>`).join(''):'<div class="suggestion-empty">Совпадений нет — будет создано новое имя</div>';
+  suggestions.hidden=false;
+  suggestions.querySelectorAll('button').forEach(b=>b.onclick=()=>{personInput.value=b.textContent;suggestions.hidden=true});
+ };
+ personInput.addEventListener('input',showSuggestions);
+ personInput.addEventListener('focus',showSuggestions);
+ personInput.addEventListener('blur',()=>setTimeout(()=>suggestions.hidden=true,180));
+ }
  if(type==='operation')$('#opKind').onchange=e=>{const cat=$('#opCategory');cat.innerHTML=(e.target.value==='expense'?expenseCategories:['Зарплата','Дополнительный доход','Возврат долга','Другое']).map(c=>`<option>${c}</option>`).join('')};
 }
 function closeModal(){$('#modal').close()}
@@ -122,7 +150,7 @@ function importJSONFile(file){
     if(!currentIds.has(String(item.id))){
      const copy={...item};
      if(k==='ops'){if(!copy.date)copy.date=today();if(!copy.category)copy.category='Без категории';}
-     if(k==='debts'&&!copy.date)copy.date=today();
+     if(k==='debts'&&!copy.date)copy.date=today();if(k==='payments'){if(copy.paidAmount===undefined)copy.paidAmount=copy.paid?Number(copy.amount):0;copy.paid=copy.paidAmount>=Number(copy.amount)}if(k==='debts'&&copy.paidAmount===undefined)copy.paidAmount=0;
      db[k].push(copy);currentIds.add(String(copy.id));added[k]++;
     }
    });
@@ -147,7 +175,8 @@ function exportPDF(){
  const w=window.open('','_blank');if(!w){alert('Разрешите всплывающие окна для печати PDF.');return}
  const esc2=esc;
  const content=`<html lang="ru"><head><meta charset="utf-8"><title>Отчёт AylinFinance</title><style>
- body{font:14px Arial,sans-serif;color:#18243b;margin:32px}h1{color:#17325f;margin-bottom:4px}h2{font-size:17px;margin:24px 0 10px;color:#17325f}.muted{color:#71809a}.cards{display:flex;gap:12px;margin:18px 0}.card{border:1px solid #dce4f0;border-radius:10px;padding:12px;flex:1}.card b{display:block;font-size:18px;margin-top:6px}table{width:100%;border-collapse:collapse;margin:8px 0 18px}th,td{padding:8px;border-bottom:1px solid #e5eaf2;text-align:left}th{background:#f2f6fc}td:last-child,th:last-child{text-align:right}.right{text-align:right}.section{page-break-inside:avoid}.foot{margin-top:28px;color:#71809a;font-size:11px;text-align:center}@media print{body{margin:15mm}}</style></head><body>
+ body{font:14px Arial,sans-serif;color:#18243b;margin:32px}.report-actions{position:sticky;top:0;display:flex;justify-content:flex-end;padding:8px 0;background:#fff}.report-actions button{border:0;border-radius:9px;background:#2878e8;color:white;font-size:15px;font-weight:600;padding:10px 16px;cursor:pointer}@media print{.report-actions{display:none}}h1{color:#17325f;margin-bottom:4px}h2{font-size:17px;margin:24px 0 10px;color:#17325f}.muted{color:#71809a}.cards{display:flex;gap:12px;margin:18px 0}.card{border:1px solid #dce4f0;border-radius:10px;padding:12px;flex:1}.card b{display:block;font-size:18px;margin-top:6px}table{width:100%;border-collapse:collapse;margin:8px 0 18px}th,td{padding:8px;border-bottom:1px solid #e5eaf2;text-align:left}th{background:#f2f6fc}td:last-child,th:last-child{text-align:right}.right{text-align:right}.section{page-break-inside:avoid}.foot{margin-top:28px;color:#71809a;font-size:11px;text-align:center}@media print{body{margin:15mm}}</style></head><body>
+ <div class="report-actions"><button type="button" onclick="try{window.close()}catch(e){};setTimeout(()=>{if(!window.closed)history.back()},150)">Закрыть отчёт ✕</button></div>
  <h1>AylinFinance</h1><div class="muted">Персональный финансовый отчёт · сформирован ${today()}</div>
  <div class="cards"><div class="card">Общий доход<b>${fmt(t.income)}</b></div><div class="card">Общий расход<b>${fmt(t.expense)}</b></div><div class="card">Баланс<b>${fmt(t.income-t.expense)}</b></div></div>
  <h2>Долги</h2><div class="cards"><div class="card">Мне должны<b>${fmt(debts.owed)}</b></div><div class="card">Я должен<b>${fmt(debts.owe)}</b></div></div>
