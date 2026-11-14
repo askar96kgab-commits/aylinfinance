@@ -1,53 +1,123 @@
 const $=s=>document.querySelector(s);
 const fmt=n=>new Intl.NumberFormat('ru-RU',{maximumFractionDigits:2}).format(Number(n||0))+' сом';
-const today=()=>new Date().toISOString().slice(0,10);
-let db=JSON.parse(localStorage.getItem('aylinfinance-data')||'{"ops":[],"payments":[],"debts":[]}');
-let tab='home', mode='expense';
-function save(){localStorage.setItem('aylinfinance-data',JSON.stringify(db));render()}
-function totals(){return db.ops.reduce((a,o)=>(a[o.kind]+=Number(o.amount),a),{income:0,expense:0})}
+const today=()=>{const d=new Date();return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`};
+const monthKey=d=>(d||today()).slice(0,7);
+const monthLabel=k=>{const [y,m]=k.split('-').map(Number);return new Date(y,m-1,1).toLocaleDateString('ru-RU',{month:'long',year:'numeric'})};
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const expenseCategories=['Питание на улице','Питание на работе','Продукты домой','Одежда','Бензин','Тутун','Непредвиденные расходы','Транспорт','Жильё и коммунальные услуги','Здоровье','Развлечения','Другое'];
+let db;
+try{db=JSON.parse(localStorage.getItem('aylinfinance-data')||'{}')}catch{db={}}
+db.ops=Array.isArray(db.ops)?db.ops:[];
+db.payments=Array.isArray(db.payments)?db.payments:[];
+db.debts=Array.isArray(db.debts)?db.debts:[];
+db.debtHistory=Array.isArray(db.debtHistory)?db.debtHistory:[];
+db.ops.forEach(o=>{if(!o.date)o.date=today();if(!o.category)o.category='Без категории'});
+db.debts.forEach(d=>{if(!d.date)d.date=today();if(!d.id)d.id=Date.now()+Math.random()});
+let tab='home', opsFilter='all', reportMode=false;
+function persist(){localStorage.setItem('aylinfinance-data',JSON.stringify(db))}
+function save(){persist();render()}
+function totals(list=db.ops){return list.reduce((a,o)=>(a[o.kind]+=Number(o.amount),a),{income:0,expense:0})}
+function thisMonthOps(){return db.ops.filter(o=>monthKey(o.date)===monthKey())}
+function currentPayments(){return db.payments.filter(p=>monthKey(p.date)===monthKey()&&!p.paid)}
+function debtTotals(){return db.debts.reduce((a,d)=>{a[d.direction]+=Number(d.amount);return a},{owe:0,owed:0})}
 function empty(t){return `<div class="empty">${t}</div>`}
 function row(title,sub,amount,cls='',icon='•',right=''){return `<div class="item"><div class="bubble">${icon}</div><div class="item-content"><b>${esc(title)}</b><small>${esc(sub)}</small></div><div class="amount ${cls}">${amount||''}${right}</div></div>`}
-function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+function go(to){tab=to;render();$('#view').scrollTop=0}
 function render(){
- const t=totals(),bal=t.income-t.expense, pending=db.payments.filter(p=>!p.paid).length;
+ const all=totals(),bal=all.income-all.expense, pending=db.payments.filter(p=>!p.paid).length;
+ const monthPay=db.payments.filter(p=>monthKey(p.date)===monthKey()).reduce((s,p)=>s+Number(p.amount),0);
+ const debts=debtTotals();
  let html='';
  if(tab==='home'){
- html=`<section class="hero"><div class="eyebrow">Общий баланс</div><div class="balance">${fmt(bal)}</div><div class="metrics"><div class="metric"><small>Доходы</small><b>${fmt(t.income)}</b></div><div class="metric"><small>Расходы</small><b>${fmt(t.expense)}</b></div></div></section>
- <div class="tiles"><div class="tile"><small>Платежи к оплате</small><b>${pending}</b></div><div class="tile"><small>Долги</small><b>${db.debts.length}</b></div></div><div class="section-title">Последние операции</div>${db.ops.slice().reverse().slice(0,5).map(o=>row(o.title,o.category+' · '+o.date,(o.kind==='income'?'+':'−')+fmt(o.amount),o.kind,'↗')).join('')||empty('Пока нет операций. Добавьте первый доход или расход.')}`;
+ const mo=totals(thisMonthOps());
+ html=`<section class="hero"><div class="eyebrow">Общий баланс</div><div class="balance">${fmt(bal)}</div><div class="metrics"><div class="metric"><small>Доходы за месяц</small><b>${fmt(mo.income)}</b></div><div class="metric"><small>Расходы за месяц</small><b>${fmt(mo.expense)}</b></div></div></section>
+ <div class="tiles">
+ <button class="tile" onclick="go('payments')"><small>Платежи к оплате</small><b>${pending}</b><span>На этот месяц: ${fmt(monthPay)}</span><i>›</i></button>
+ <button class="tile" onclick="go('debts')"><small>Долги</small><b>${db.debts.length}</b><span>Мне должны: ${fmt(debts.owed)}<br>Я должен: ${fmt(debts.owe)}</span><i>›</i></button>
+ </div>
+ <div class="section-title">Последние операции</div>
+ ${db.ops.slice().sort((a,b)=>(b.date||'').localeCompare(a.date||'')).slice(0,5).map(o=>row(o.title,(o.category||'Без категории')+' · '+o.date,(o.kind==='income'?'+':'−')+fmt(o.amount),o.kind,o.kind==='income'?'↙':'↗')).join('')||empty('Пока нет операций. Добавьте первый доход или расход.')}
+ <button class="primary wide" onclick="openForm('operation')">＋ Добавить операцию</button>`;
  } else if(tab==='ops'){
- html=`<div class="topline"><h2>Операции</h2><button class="primary" onclick="openForm('operation')">＋ Добавить</button></div>${db.ops.slice().reverse().map(o=>row(o.title,o.category+' · '+o.date,(o.kind==='income'?'+':'−')+fmt(o.amount),o.kind,o.kind==='income'?'↙':'↗',`<button class="ghost" onclick="removeItem('ops',${o.id})">×</button>`)).join('')||empty('Добавьте первую операцию.')}`;
+ const ops=db.ops.slice().sort((a,b)=>(b.date||'').localeCompare(a.date||''));
+ const shown=ops.filter(o=>opsFilter==='all'||(opsFilter==='purchases'?o.kind==='expense':o.kind===opsFilter));
+ const months=[...new Set(shown.map(o=>monthKey(o.date)))].sort().reverse();
+ html=`<div class="topline"><h2>Операции</h2><button class="primary" onclick="openForm('operation')">＋ Добавить</button></div>
+ <div class="filter-row"><button class="${opsFilter==='all'?'selected':''}" onclick="setOpsFilter('all')">Все</button><button class="${opsFilter==='income'?'selected':''}" onclick="setOpsFilter('income')">Доходы</button><button class="${opsFilter==='expense'?'selected':''}" onclick="setOpsFilter('expense')">Расходы</button><button class="${opsFilter==='purchases'?'selected':''}" onclick="setOpsFilter('purchases')">История покупок</button></div>
+ ${months.map(m=>`<h3 class="month-heading">${monthLabel(m)}</h3>${shown.filter(o=>monthKey(o.date)===m).map(o=>row(o.title,(o.category||'Без категории')+' · '+o.date,(o.kind==='income'?'+':'−')+fmt(o.amount),o.kind,o.kind==='income'?'↙':'↗',`<button class="ghost" aria-label="Удалить" onclick="removeItem('ops',${o.id})">×</button>`)).join('')}`).join('')||empty('Записей пока нет.')}`;
  } else if(tab==='payments'){
- html=`<div class="topline"><h2>Мои платежи</h2><button class="primary" onclick="openForm('payment')">＋ Добавить</button></div><div class="panel"><b>${pending}</b> платежей ожидают оплаты</div>${db.payments.slice().sort((a,b)=>a.date.localeCompare(b.date)).map(p=>`<div class="item"><div class="bubble">▦</div><div class="item-content"><b>${esc(p.title)}</b><small>${p.date} · ${p.repeat?'Ежемесячно':'Разовый'}</small><span class="badge ${p.paid?'paid':''}">${p.paid?'Оплачено':'Ожидает'}</span></div><div class="amount">${fmt(p.amount)}<button class="ghost" onclick="togglePaid(${p.id})">${p.paid?'↶':'✓'}</button><button class="ghost" onclick="removeItem('payments',${p.id})">×</button></div></div>`).join('')||empty('Добавьте регулярные или разовые платежи.')}`;
+ const months=[...new Set(db.payments.map(p=>monthKey(p.date)))].sort().reverse();
+ html=`<div class="topline"><h2>Мои платежи</h2><button class="primary" onclick="openForm('payment')">＋ Добавить</button></div>
+ <div class="panel summary-line"><b>${pending}</b> платежей ожидают оплаты <strong>На этот месяц: ${fmt(monthPay)}</strong></div>
+ ${months.map(m=>{const ps=db.payments.filter(p=>monthKey(p.date)===m).sort((a,b)=>a.date.localeCompare(b.date));const sum=ps.reduce((s,p)=>s+Number(p.amount),0);return `<section class="month-group"><div class="month-head"><h3>${monthLabel(m)}</h3><b>${fmt(sum)}</b></div>${ps.map(p=>`<div class="item"><div class="bubble">▦</div><div class="item-content"><b>${esc(p.title)}</b><small>${p.date} · ${p.repeat?'Ежемесячно':'Разовый'}</small><span class="badge ${p.paid?'paid':''}">${p.paid?'Оплачено':'Ожидает'}</span></div><div class="amount">${fmt(p.amount)}<button class="ghost" onclick="togglePaid(${p.id})">${p.paid?'↶':'✓'}</button><button class="ghost" onclick="removeItem('payments',${p.id})">×</button></div></div>`).join('')}</section>`}).join('')||empty('Добавьте регулярные или разовые платежи.')}`;
  } else if(tab==='debts'){
- html=`<div class="topline"><h2>Долги</h2><button class="primary" onclick="openForm('debt')">＋ Добавить</button></div>${db.debts.map(d=>row(d.person,d.direction==='owe'?'Я должен':'Мне должны',fmt(d.amount),'', '↔',`<button class="ghost" onclick="removeItem('debts',${d.id})">×</button>`)).join('')||empty('Пока нет долгов.')}`;
+ const names=[...new Set(db.debts.map(d=>d.person.trim()))].sort((a,b)=>a.localeCompare(b,'ru'));
+ const grouped=names.map(person=>({person,items:db.debts.filter(d=>d.person.trim()===person)}));
+ html=`<div class="topline"><h2>Долги</h2><button class="primary" onclick="openForm('debt')">＋ Добавить</button></div>
+ <div class="debt-summary"><div><small>Мне должны</small><b>${fmt(debts.owed)}</b></div><div><small>Я должен</small><b>${fmt(debts.owe)}</b></div></div>
+ ${grouped.map(g=>{const owed=g.items.filter(x=>x.direction==='owed').reduce((s,x)=>s+Number(x.amount),0),owe=g.items.filter(x=>x.direction==='owe').reduce((s,x)=>s+Number(x.amount),0);return `<section class="debt-person"><div class="month-head"><h3>${esc(g.person)}</h3><button class="small-action" onclick="openForm('debt','${esc(g.person).replace(/'/g,"&#39;")}')">＋ Новый долг</button></div>${g.items.slice().sort((a,b)=>(b.date||'').localeCompare(a.date||'')).map(d=>`<div class="debt-entry"><div><b>${d.direction==='owed'?'Мне должны':'Я должен'} · ${fmt(d.amount)}</b><small>${esc(d.date||'Дата не указана')}</small>${d.note?`<small>${esc(d.note)}</small>`:''}</div><button class="ghost" onclick="removeItem('debts',${d.id})">×</button></div>`).join('')}<div class="person-total">Итого: ${owed?`мне должны ${fmt(owed)}`:''}${owed&&owe?' · ':''}${owe?`я должен ${fmt(owe)}`:''}</div></section>`}).join('')||empty('Пока нет долгов.')}`;
  } else {
- const max=Math.max(t.income,t.expense,1);
- html=`<h2>Аналитика</h2><div class="panel"><b>Доходы</b><div>${fmt(t.income)}</div><div class="progress"><i style="width:${t.income/max*100}%"></i></div><b>Расходы</b><div>${fmt(t.expense)}</div><div class="progress"><i style="width:${t.expense/max*100}%;background:#e05a61"></i></div><hr><b>Чистый результат: ${fmt(t.income-t.expense)}</b></div><div class="section-title">Структура операций</div>${db.ops.length?db.ops.reduce((s,o)=>(s[o.category]=(s[o.category]||0)+Number(o.amount),s),{} )&&Object.entries(db.ops.reduce((s,o)=>(s[o.category]=(s[o.category]||0)+Number(o.amount),s),{})).map(([k,v])=>row(k,'Сумма операций',fmt(v))).join(''):empty('Добавьте операции для аналитики.')}`;
+ const mo=thisMonthOps(), mt=totals(mo), byCat=mo.filter(o=>o.kind==='expense').reduce((s,o)=>(s[o.category||'Без категории']=(s[o.category||'Без категории']||0)+Number(o.amount),s),{});
+ const max=Math.max(...Object.values(byCat),1);
+ const allMonths=[...new Set(db.ops.map(o=>monthKey(o.date)))].sort().reverse();
+ html=`<h2>Аналитика</h2><div class="panel"><h3>${monthLabel(monthKey())}</h3><div class="stats-grid"><div><small>Доходы</small><b class="income">${fmt(mt.income)}</b></div><div><small>Расходы</small><b class="expense">${fmt(mt.expense)}</b></div></div><div class="progress"><i style="width:${mt.income/Math.max(mt.income,mt.expense,1)*100}%"></i></div><b>Остаток за месяц: ${fmt(mt.income-mt.expense)}</b></div>
+ <div class="section-title">Расходы по категориям за месяц</div>
+ ${Object.entries(byCat).sort((a,b)=>b[1]-a[1]).map(([k,v])=>`<div class="category-stat"><div><b>${esc(k)}</b><strong>${fmt(v)}</strong></div><div class="progress"><i style="width:${v/max*100}%;background:#e05a61"></i></div></div>`).join('')||empty('Добавьте расходы — здесь появится анализ по категориям.')}
+ <div class="section-title">История по месяцам</div>${allMonths.map(m=>{const x=totals(db.ops.filter(o=>monthKey(o.date)===m));return `<div class="month-row"><b>${monthLabel(m)}</b><span class="income">+ ${fmt(x.income)}</span><span class="expense">− ${fmt(x.expense)}</span></div>`}).join('')||empty('Пока нет данных.')}`;
  }
  $('#view').innerHTML=html;
  document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('active',b.dataset.tab===tab));
 }
-document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>{tab=b.dataset.tab;render()});
-function removeItem(table,id){if(confirm('Удалить запись?')){db[table]=db[table].filter(x=>x.id!==id);save()}}
-function togglePaid(id){const p=db.payments.find(x=>x.id===id);p.paid=!p.paid;save()}
-function openForm(type){
+function setOpsFilter(v){opsFilter=v;render()}
+document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>go(b.dataset.tab));
+function removeItem(table,id){if(confirm('Удалить запись?')){db[table]=db[table].filter(x=>String(x.id)!==String(id));save()}}
+function togglePaid(id){
+ const p=db.payments.find(x=>String(x.id)===String(id));if(!p)return;
+ p.paid=!p.paid;
+ // После оплаты ежемесячного платежа создаём следующий месяц, не меняя историю.
+ if(p.paid&&p.repeat){
+   const [y,m,d]=p.date.split('-').map(Number);const next=new Date(y,m,Math.min(d,new Date(y,m+1,0).getDate()));
+   const nd=`${next.getFullYear()}-${String(next.getMonth()+1).padStart(2,'0')}-${String(next.getDate()).padStart(2,'0')}`;
+   if(!db.payments.some(x=>x.title===p.title&&x.date===nd))db.payments.push({id:Date.now()+Math.random(),title:p.title,amount:p.amount,date:nd,repeat:true,paid:false});
+ }
+ save();
+}
+function openForm(type,preset=''){
  const fields=$('#formFields');$('#modalTitle').textContent=type==='operation'?'Новая операция':type==='payment'?'Новый платёж':'Новый долг';
  let html='';
- if(type==='operation')html=`<label>Тип операции<select name="kind"><option value="expense">Расход</option><option value="income">Доход</option></select></label><label>Название<input name="title" required placeholder="Например, зарплата"></label><label>Сумма, сом<input name="amount" required type="number" min="0.01" step="0.01"></label><label>Категория<input name="category" placeholder="Продукты, транспорт..."></label>`;
+ if(type==='operation')html=`<label>Тип операции<select name="kind" id="opKind"><option value="expense">Расход</option><option value="income">Доход</option></select></label><label>Название<input name="title" required placeholder="Например, зарплата"></label><label>Сумма, сом<input name="amount" required type="number" min="0.01" step="0.01"></label><label>Категория<select name="category" id="opCategory">${expenseCategories.map(c=>`<option>${c}</option>`).join('')}<option>Зарплата</option><option>Дополнительный доход</option></select></label><label>Дата<input name="date" type="date" value="${today()}" required></label>`;
  if(type==='payment')html=`<label>Название<input name="title" required placeholder="Аренда, кредит, интернет"></label><label>Сумма, сом<input name="amount" required type="number" min="0.01" step="0.01"></label><label>Дата оплаты<input name="date" type="date" value="${today()}" required></label><label>Повторение<select name="repeat"><option value="yes">Ежемесячно</option><option value="no">Разовый платёж</option></select></label>`;
- if(type==='debt')html=`<label>Имя / описание<input name="person" required placeholder="Кому или от кого"></label><label>Сумма, сом<input name="amount" required type="number" min="0.01" step="0.01"></label><label>Тип<select name="direction"><option value="owe">Я должен</option><option value="owed">Мне должны</option></select></label>`;
+ if(type==='debt')html=`<label>ФИО / имя должника<input name="person" id="debtPerson" list="debtNames" autocomplete="off" required placeholder="Начните вводить имя"><datalist id="debtNames">${[...new Set(db.debts.map(d=>d.person))].map(n=>`<option value="${esc(n)}">`).join('')}</datalist><small class="hint">Выберите существующее имя или введите новое.</small></label><label>Сумма, сом<input name="amount" required type="number" min="0.01" step="0.01"></label><label>Тип<select name="direction"><option value="owed">Мне должны</option><option value="owe">Я должен</option></select></label><label>Дата долга<input name="date" type="date" value="${today()}" required></label><label>Примечание (необязательно)<input name="note" placeholder="Например, за покупку"></label>`;
  fields.innerHTML=html;$('#modal').dataset.type=type;$('#modal').showModal();
+ if(type==='debt'&&preset)$('#debtPerson').value=preset;
+ if(type==='operation')$('#opKind').onchange=e=>{const cat=$('#opCategory');cat.innerHTML=(e.target.value==='expense'?expenseCategories:['Зарплата','Дополнительный доход','Возврат долга','Другое']).map(c=>`<option>${c}</option>`).join('')};
 }
+function closeModal(){$('#modal').close()}
+$('#closeModal').onclick=closeModal;$('#cancelModal').onclick=closeModal;
 $('#entryForm').addEventListener('submit',e=>{
- if(e.submitter?.value==='cancel')return;
  e.preventDefault();const f=new FormData(e.currentTarget),type=$('#modal').dataset.type;
  const amount=Number(f.get('amount'));if(!(amount>0))return alert('Введите сумму больше нуля.');
- const id=Date.now();
- if(type==='operation')db.ops.push({id,kind:f.get('kind'),title:f.get('title'),amount,category:f.get('category')||'Без категории',date:today()});
+ const id=Date.now()+Math.random();
+ if(type==='operation')db.ops.push({id,kind:f.get('kind'),title:f.get('title'),amount,category:f.get('category')||'Без категории',date:f.get('date')||today()});
  if(type==='payment')db.payments.push({id,title:f.get('title'),amount,date:f.get('date'),repeat:f.get('repeat')==='yes',paid:false});
- if(type==='debt')db.debts.push({id,person:f.get('person'),amount,direction:f.get('direction')});
- $('#modal').close();save();
+ if(type==='debt')db.debts.push({id,person:f.get('person').trim(),amount,direction:f.get('direction'),date:f.get('date')||today(),note:f.get('note')||''});
+ closeModal();save();
 });
-$('#exportBtn').onclick=()=>{const blob=new Blob([JSON.stringify(db,null,2)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='aylinfinance-backup.json';a.click();URL.revokeObjectURL(a.href)};
+function exportJSON(){const blob=new Blob([JSON.stringify(db,null,2)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='aylinfinance-backup.json';a.click();URL.revokeObjectURL(a.href)}
+function exportPDF(){
+ const t=totals(), debts=debtTotals(), months=[...new Set([...db.ops.map(o=>monthKey(o.date)),...db.payments.map(p=>monthKey(p.date))])].sort().reverse();
+ const w=window.open('','_blank');if(!w){alert('Разрешите всплывающие окна для печати PDF.');return}
+ const esc2=esc;
+ const content=`<html lang="ru"><head><meta charset="utf-8"><title>Отчёт AylinFinance</title><style>
+ body{font:14px Arial,sans-serif;color:#18243b;margin:32px}h1{color:#17325f;margin-bottom:4px}h2{font-size:17px;margin:24px 0 10px;color:#17325f}.muted{color:#71809a}.cards{display:flex;gap:12px;margin:18px 0}.card{border:1px solid #dce4f0;border-radius:10px;padding:12px;flex:1}.card b{display:block;font-size:18px;margin-top:6px}table{width:100%;border-collapse:collapse;margin:8px 0 18px}th,td{padding:8px;border-bottom:1px solid #e5eaf2;text-align:left}th{background:#f2f6fc}td:last-child,th:last-child{text-align:right}.right{text-align:right}.section{page-break-inside:avoid}.foot{margin-top:28px;color:#71809a;font-size:11px;text-align:center}@media print{body{margin:15mm}}</style></head><body>
+ <h1>AylinFinance</h1><div class="muted">Персональный финансовый отчёт · сформирован ${today()}</div>
+ <div class="cards"><div class="card">Общий доход<b>${fmt(t.income)}</b></div><div class="card">Общий расход<b>${fmt(t.expense)}</b></div><div class="card">Баланс<b>${fmt(t.income-t.expense)}</b></div></div>
+ <h2>Долги</h2><div class="cards"><div class="card">Мне должны<b>${fmt(debts.owed)}</b></div><div class="card">Я должен<b>${fmt(debts.owe)}</b></div></div>
+ ${months.map(m=>`<div class="section"><h2>${monthLabel(m)}</h2><table><tr><th>Дата</th><th>Операция</th><th>Категория</th><th>Тип</th><th>Сумма</th></tr>${db.ops.filter(o=>monthKey(o.date)===m).map(o=>`<tr><td>${esc2(o.date)}</td><td>${esc2(o.title)}</td><td>${esc2(o.category)}</td><td>${o.kind==='income'?'Доход':'Расход'}</td><td>${fmt(o.amount)}</td></tr>`).join('')||'<tr><td colspan="5">Нет операций</td></tr>'}</table><table><tr><th>Платёж</th><th>Дата</th><th>Статус</th><th>Сумма</th></tr>${db.payments.filter(p=>monthKey(p.date)===m).map(p=>`<tr><td>${esc2(p.title)}</td><td>${esc2(p.date)}</td><td>${p.paid?'Оплачено':'Ожидает'}</td><td>${fmt(p.amount)}</td></tr>`).join('')||'<tr><td colspan="4">Нет платежей</td></tr>'}</table></div>`).join('')}
+ <h2>Долговые записи</h2><table><tr><th>Имя</th><th>Направление</th><th>Дата</th><th>Сумма</th></tr>${db.debts.map(d=>`<tr><td>${esc2(d.person)}</td><td>${d.direction==='owed'?'Мне должны':'Я должен'}</td><td>${esc2(d.date||'')}</td><td>${fmt(d.amount)}</td></tr>`).join('')||'<tr><td colspan="4">Нет долгов</td></tr>'}</table>
+ <div class="foot">Акча бул жөн гана каражат, бирок үнөмдөөнү унутпа · AylinFinance</div><script>window.onload=()=>window.print()</script></body></html>`;
+ w.document.open();w.document.write(content);w.document.close();
+}
+$('#exportBtn').onclick=()=>{const choice=confirm('Нажмите «ОК» для PDF-отчёта или «Отмена» для JSON-резервной копии.');if(choice)exportPDF();else exportJSON()};
 if('serviceWorker'in navigator)window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js').catch(()=>{}));
 render();
