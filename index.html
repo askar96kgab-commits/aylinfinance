@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#101d3a">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="AylinFinance">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<link rel="stylesheet" href="style.css">
+<title>AylinFinance</title>
+</head>
+<body>
+<div class="app">
+<header><div class="brand"><div class="mark">A</div><div><b>AylinFinance</b><small>Личный финансовый помощник</small></div></div><button class="ghost" id="exportBtn">Экспорт</button></header>
+<main id="view"></main>
+<nav>
+<button data-tab="home" class="active"><span>⌂</span>Главная</button>
+<button data-tab="ops"><span>⇄</span>Операции</button>
+<button data-tab="payments"><span>▦</span>Платежи</button>
+<button data-tab="debts"><span>↔</span>Долги</button>
+<button data-tab="stats"><span>◔</span>Аналитика</button>
+</nav>
+</div>
+<dialog id="modal"><form method="dialog" id="entryForm"><div class="modal-head"><b id="modalTitle">Новая запись</b><button class="ghost" value="cancel">✕</button></div><div id="formFields"></div><div class="modal-actions"><button class="secondary" value="cancel">Отмена</button><button class="primary" id="saveBtn" value="default">Сохранить</button></div></form></dialog>
+<script src="app.js"></script>
+</body></html>
