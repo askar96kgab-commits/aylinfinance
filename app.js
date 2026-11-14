@@ -103,6 +103,44 @@ $('#entryForm').addEventListener('submit',e=>{
  if(type==='debt')db.debts.push({id,person:f.get('person').trim(),amount,direction:f.get('direction'),date:f.get('date')||today(),note:f.get('note')||''});
  closeModal();save();
 });
+
+function importJSONFile(file){
+ if(!file)return;
+ const reader=new FileReader();
+ reader.onload=()=>{
+  let incoming;
+  try{incoming=JSON.parse(String(reader.result||''))}catch{return alert('Не удалось прочитать файл. Нужен корректный JSON-файл резервной копии.')}
+  if(!incoming||typeof incoming!=='object'||!Array.isArray(incoming.ops)||!Array.isArray(incoming.payments)||!Array.isArray(incoming.debts)){
+   return alert('Структура файла не распознана. Нужна резервная копия AylinFinance с разделами ops, payments и debts.');
+  }
+  const valid=(arr)=>arr.filter(x=>x&&typeof x==='object'&&Number(x.amount)>=0&&x.id!==undefined);
+  const groups=['ops','payments','debts'];
+  let added={ops:0,payments:0,debts:0};
+  groups.forEach(k=>{
+   const currentIds=new Set(db[k].map(x=>String(x.id)));
+   valid(incoming[k]).forEach(item=>{
+    if(!currentIds.has(String(item.id))){
+     const copy={...item};
+     if(k==='ops'){if(!copy.date)copy.date=today();if(!copy.category)copy.category='Без категории';}
+     if(k==='debts'&&!copy.date)copy.date=today();
+     db[k].push(copy);currentIds.add(String(copy.id));added[k]++;
+    }
+   });
+  });
+  if(Array.isArray(incoming.debtHistory)){
+   db.debtHistory=Array.isArray(db.debtHistory)?db.debtHistory:[];
+   const ids=new Set(db.debtHistory.map(x=>String(x.id)));
+   incoming.debtHistory.forEach(x=>{if(x&&x.id!==undefined&&!ids.has(String(x.id))){db.debtHistory.push(x);ids.add(String(x.id));}});
+  }
+  persist();render();
+  alert(`Импорт завершён. Добавлено:\\nПлатежи: ${added.payments}\\nДолги: ${added.debts}\\nОперации: ${added.ops}\\n\\nСуществующие записи сохранены.`);
+ };
+ reader.onerror=()=>alert('Не удалось открыть файл резервной копии.');
+ reader.readAsText(file);
+}
+$('#importBtn').onclick=()=>$('#importFile').click();
+$('#importFile').addEventListener('change',e=>{importJSONFile(e.target.files?.[0]);e.target.value='';});
+
 function exportJSON(){const blob=new Blob([JSON.stringify(db,null,2)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='aylinfinance-backup.json';a.click();URL.revokeObjectURL(a.href)}
 function exportPDF(){
  const t=totals(), debts=debtTotals(), months=[...new Set([...db.ops.map(o=>monthKey(o.date)),...db.payments.map(p=>monthKey(p.date))])].sort().reverse();

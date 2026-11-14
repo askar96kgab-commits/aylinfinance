@@ -16,7 +16,11 @@
 <div class="app">
 <header>
   <div class="brand"><div class="mark">A</div><div><b>AylinFinance</b><small>Личный финансовый помощник</small></div></div>
-  <button class="ghost" id="exportBtn">PDF / Экспорт</button>
+  <div class="header-actions">
+    <button class="ghost" id="importBtn" type="button">Импорт</button>
+    <button class="ghost" id="exportBtn" type="button">PDF / Экспорт</button>
+  </div>
+  <input id="importFile" type="file" accept=".json,application/json" hidden>
 </header>
 <main id="view" aria-live="polite"></main>
 <footer class="motto">Акча бул жөн гана каражат, бирок үнөмдөөнү унутпа</footer>
